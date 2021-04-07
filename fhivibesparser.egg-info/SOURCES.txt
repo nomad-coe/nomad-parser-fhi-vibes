@@ -1,0 +1,12 @@
+README.md
+setup.py
+fhivibesparser/__init__.py
+fhivibesparser/__main__.py
+fhivibesparser/fhivibes_parser.py
+fhivibesparser.egg-info/PKG-INFO
+fhivibesparser.egg-info/SOURCES.txt
+fhivibesparser.egg-info/dependency_links.txt
+fhivibesparser.egg-info/requires.txt
+fhivibesparser.egg-info/top_level.txt
+fhivibesparser/metainfo/__init__.py
+fhivibesparser/metainfo/fhi_vibes.py
