@@ -30,7 +30,7 @@ from nomad.parsing.file_parser import FileParser
 from .metainfo import m_env
 from nomad.datamodel.metainfo.common_dft import Run, Method, System, Workflow,\
     SingleConfigurationCalculation, EnergyContribution, StressTensorContribution,\
-    AtomStressContribution
+    AtomStressContribution, XCFunctionals
 from fhivibesparser.metainfo.fhi_vibes import x_fhi_vibes_section_attributes,\
     x_fhi_vibes_section_metadata, x_fhi_vibes_section_atoms, x_fhi_vibes_section_MD,\
     x_fhi_vibes_section_calculator, x_fhi_vibes_section_calculator_parameters,\
@@ -199,6 +199,25 @@ class FHIVibesParser(FairdiParser):
                 setattr(sec_scc, 'x_fhi_vibes_%s' % key, val)
 
     def parse_method(self, n_run):
+        def parse_xc_functional():
+            # TODO This is a temporary fix to circumvent the normalization tests failure
+            # due to missing xc functional information but this should be fetched directly
+            # from the underlying calculation
+            xc_type_map = {'PW': 'C'}
+            calculator_parameters = self.parser.get(
+                'attrs/raw_metadata/calculator/calculator_parameters', {})
+            xc_functional = calculator_parameters.get('xc', '').upper()
+            xc_functional_info = re.match(r'(\w+)\S+?((?:LDA|GGA|MGGA|HYB_GGA|HYB_MGGA))', xc_functional)
+            if xc_functional_info:
+                xc_name = xc_functional_info.group(1)
+                xc_type = xc_type_map.get(xc_name, None)
+                if xc_type is None:
+                    self.logger.error('Cannot resolve XC functional.')
+                    return
+                sec_xc_functional = sec_method.m_create(XCFunctionals)
+                sec_xc_functional.XC_functional_name = '%s_%s_%s' % (
+                    xc_functional_info.group(2), xc_type, xc_functional_info.group(1))
+
         def parse_atoms(section, atoms):
             for key, val in atoms.items():
                 # why is the formatting of symbols and masses different for atoms?
@@ -274,6 +293,9 @@ class FHIVibesParser(FairdiParser):
                     setattr(sec_metadata, key, val)
 
         sec_method = self.archive.section_run[n_run].m_create(Method)
+
+        parse_xc_functional()
+
         sec_attrs = sec_method.m_create(x_fhi_vibes_section_attributes)
 
         attrs = self.parser.get('attrs')
@@ -334,8 +356,10 @@ class FHIVibesParser(FairdiParser):
 
         for n_run, sec_run in enumerate(self.archive.section_run):
             sec_run.program_name = 'FHI-vibes'
-
             sec_run.program_version = metadata['vibes']['version']
+
+            if metadata['calculator']['calculator'].lower() == 'aims':
+                sec_run.program_basis_set_type = 'numeric AOs'
 
             self.parse_method(n_run)
 
