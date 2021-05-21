@@ -22,8 +22,8 @@ import logging
 import xarray
 import json
 import re
-import pint
 
+from nomad.units import ureg
 from nomad.parsing.parser import FairdiParser
 from nomad.parsing.file_parser import FileParser
 
@@ -95,14 +95,14 @@ class FHIVibesParser(FairdiParser):
         self._metainfo_env = m_env
 
         self._units = {
-            'volume': 'angstrom**3', 'displacements': 'angstrom', 'velocities': 'angstrom/fs',
-            'momenta': 'eV*fs/angstrom', 'force_constants': 'eV/angstrom**2',
-            'forces_harmonic': 'eV/angstrom', 'forces': 'eV/angstrom', 'stress': 'eV/angstrom**3',
-            'energy_potential_harmonic': 'eV', 'sigma_per_sample': None,
-            'pressure': 'eV/angstrom**3', 'temperature': 'K', 'pressure_kinetic': 'eV/angstrom**3',
-            'pressure_potential': 'eV/angstrom**3', 'aims_uuid': None, 'energy': 'eV',
-            'heat_flux': 'amu/fs**3', 'heat_flux_harmonic': 'amu/fs**3',
-            'heat_flux_0_harmonic': 'amu/fs**3', 'mass': 'amu', 'length': 'angstrom', 'time': 'fs'}
+            'volume': ureg.angstrom ** 3, 'displacements': ureg.angstrom, 'velocities': ureg.angstrom / ureg.fs,
+            'momenta': ureg.eV * ureg.fs / ureg.angstrom, 'force_constants': ureg.eV / ureg.angstrom ** 2,
+            'forces_harmonic': ureg.eV / ureg.angstrom, 'forces': ureg.eV / ureg.angstrom, 'stress': ureg.eV / ureg.angstrom ** 3,
+            'energy_potential_harmonic': ureg.eV, 'sigma_per_sample': None,
+            'pressure': ureg.eV / ureg.angstrom ** 3, 'temperature': ureg.K, 'pressure_kinetic': ureg.eV / ureg.angstrom ** 3,
+            'pressure_potential': ureg.eV / ureg.angstrom ** 3, 'aims_uuid': None, 'energy': ureg.eV,
+            'heat_flux': ureg.amu / ureg.fs ** 3, 'heat_flux_harmonic': ureg.amu / ureg.fs ** 3,
+            'heat_flux_0_harmonic': ureg.amu / ureg.fs ** 3, 'mass': ureg.amu, 'length': ureg.angstrom, 'time': ureg.fs}
 
     @property
     def n_frames(self):
@@ -228,12 +228,11 @@ class FHIVibesParser(FairdiParser):
                             val_flattened.extend([val_i[1]] * val_i[0])
                         val = val_flattened
                     if key == 'masses':
-                        val = pint.Quantity(val, self._units.get('mass'))
+                        val = val * self._units.get('mass')
                 elif key in ['positions', 'cell']:
-                    val = pint.Quantity(val, self._units.get('length'))
+                    val = val * self._units.get('length')
                 elif key == 'velocities':
-                    val = pint.Quantity(val, '%s/%s' % (
-                        self._units.get('length'), self._units.get('time')))
+                    val = val * self._units.get('length') / self._units.get('time')
                 setattr(section, 'x_fhi_vibes_atoms_%s' % key, val)
 
         def parse_metadata():
@@ -298,6 +297,7 @@ class FHIVibesParser(FairdiParser):
 
         sec_attrs = sec_method.m_create(x_fhi_vibes_section_attributes)
 
+        time_units = {'ns': ureg.ns, 'fs': ureg.fs, 'ps': ureg.ps}
         attrs = self.parser.get('attrs')
         for key, val in attrs.items():
             if key == 'raw_metadata':
@@ -311,9 +311,9 @@ class FHIVibesParser(FairdiParser):
                 setattr(sec_attrs, 'x_fhi_vibes_attributes_number_of_%s' % key, len(atoms['positions']))
             else:
                 if key == 'masses':
-                    val = pint.Quantity(val, self._units.get('mass'))
+                    val = val * self._units.get('mass')
                 elif key == 'timestep':
-                    val = pint.Quantity(val, attrs.get('time_unit', self._units.get('time')))
+                    val = val * time_units.get(attrs.get('time_unit').lower(), self._units.get('time'))
                 setattr(sec_attrs, 'x_fhi_vibes_attributes_%s' % key, val)
 
         # we need this information for force constants
