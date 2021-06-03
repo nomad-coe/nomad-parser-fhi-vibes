@@ -29,8 +29,7 @@ from nomad.parsing.file_parser import FileParser
 
 from .metainfo import m_env
 from nomad.datamodel.metainfo.common_dft import Run, Method, System, Workflow,\
-    SingleConfigurationCalculation, EnergyContribution, StressTensorContribution,\
-    AtomStressContribution, XCFunctionals
+    SingleConfigurationCalculation, Energy, Forces, Stress, XCFunctionals
 from fhivibesparser.metainfo.fhi_vibes import x_fhi_vibes_section_attributes,\
     x_fhi_vibes_section_metadata, x_fhi_vibes_section_atoms, x_fhi_vibes_section_MD,\
     x_fhi_vibes_section_calculator, x_fhi_vibes_section_calculator_parameters,\
@@ -134,21 +133,19 @@ class FHIVibesParser(FairdiParser):
             for key in ['kinetic', 'potential']:
                 val = self.parser.get('energy_%s' % key, unit=self._units.get('energy'))
                 if val is not None:
-                    sec_energy = sec_scc.m_create(EnergyContribution)
-                    sec_energy.energy_contribution_kind = key
-                    sec_energy.energy_contribution_value = val[n_frame]
+                    sec_energy = sec_scc.m_create(Energy, SingleConfigurationCalculation.energy_contributions)
+                    sec_energy.kind = key
+                    sec_energy.value = val[n_frame]
 
                 val = self.parser.get('stress_%s' % key, unit=self._units.get('stress'))
                 if val is not None:
-                    sec_stress = sec_scc.m_create(StressTensorContribution)
-                    sec_stress.stress_tensor_contribution_kind = key
-                    sec_stress.stress_tensor_contribution_value = val[n_frame]
+                    sec_stress = sec_scc.m_create(Stress, SingleConfigurationCalculation.stress_contributions)
+                    sec_stress.kind = key
+                    sec_stress.value = val[n_frame]
 
-                val = self.parser.get('stresses_%s' % key, unit=self._units.get('stress'))
-                if val is not None:
-                    sec_atom_stress = sec_scc.m_create(AtomStressContribution)
-                    sec_atom_stress.atom_stress_contribution_kind = key
-                    sec_atom_stress.atom_stress_contribution_value = val[n_frame]
+                    val = self.parser.get('stresses_%s' % key, unit=self._units.get('stress'))
+                    if val is not None:
+                        sec_stress.values_per_atom = val[n_frame]
 
             calculation_quantities = [
                 'volume', 'displacements', 'momenta', 'forces_harmonic',
@@ -165,10 +162,14 @@ class FHIVibesParser(FairdiParser):
                     continue
                 if key.startswith('forces'):
                     key = 'atom_%s' % key
-                elif key == 'stress':
-                    key = 'stress_tensor'
 
-                if key in ['temperature', 'pressure', 'atom_forces', 'stress_tensor']:
+                if key == 'atom_forces':
+                    sec_scc.m_add_sub_section(
+                        SingleConfigurationCalculation.forces_total, Forces(value=val[n_frame]))
+                elif key == 'stress':
+                    sec_scc.m_add_sub_section(
+                        SingleConfigurationCalculation.stress_total, Stress(value=val[n_frame]))
+                if key in ['temperature', 'pressure']:
                     setattr(sec_scc, key, val[n_frame])
                 else:
                     setattr(sec_scc, 'x_fhi_vibes_%s' % key, val[n_frame])

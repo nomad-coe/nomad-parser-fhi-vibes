@@ -46,17 +46,17 @@ def test_singlepoint(parser):
     assert sec_run[5].section_system[0].atom_velocities[1][0].magnitude == approx(-2.18864066e+03)
 
     sec_scc = sec_run[9].section_single_configuration_calculation[0]
-    assert len(sec_scc.section_energy_contribution) == 2
-    assert sec_scc.section_energy_contribution[1].energy_contribution_value.magnitude == approx(-1.00925367e-14)
+    assert len(sec_scc.energy_contributions) == 2
+    assert sec_scc.energy_contributions[1].value.magnitude == approx(-1.00925367e-14)
 
     sec_scc = sec_run[3].section_single_configuration_calculation[0]
-    assert sec_scc.section_stress_tensor_contribution[0].stress_tensor_contribution_value[1][2].magnitude == approx(-1.42111377e+07)
+    assert sec_scc.stress_contributions[0].value[1][2].magnitude == approx(-1.42111377e+07)
 
     sec_scc = sec_run[1].section_single_configuration_calculation[0]
-    assert sec_scc.stress_tensor[1][1].magnitude == approx(1.49076266e+08)
+    assert sec_scc.stress_total.value[1][1].magnitude == approx(1.49076266e+08)
 
     sec_scc = sec_run[6].section_single_configuration_calculation[0]
-    assert sec_scc.atom_forces[5][2].magnitude == approx(-3.47924808e-10)
+    assert sec_scc.forces_total.value[5][2].magnitude == approx(-3.47924808e-10)
 
     sec_scc = sec_run[5].section_single_configuration_calculation[0]
     assert sec_scc.pressure.magnitude == approx(2.52108927e+07)
@@ -92,7 +92,7 @@ def test_relaxation(parser):
     sec_sccs = archive.section_run[0].section_single_configuration_calculation
     assert len(sec_sccs) == 3
     assert sec_sccs[2].x_fhi_vibes_volume.magnitude == approx(3.97721030e-29)
-    assert sec_sccs[0].section_energy_contribution[1].energy_contribution_value.magnitude == approx(-2.52313962e-15)
+    assert sec_sccs[0].energy_contributions[1].value.magnitude == approx(-2.52313962e-15)
 
 
 def test_molecular_dynamics(parser):
@@ -133,7 +133,7 @@ def test_phonon(parser):
 
     sec_sccs = archive.section_run[0].section_single_configuration_calculation
     assert len(sec_sccs) == 1
-    assert sec_sccs[0].atom_forces[6][1].magnitude == approx(-3.96793297e-11)
+    assert sec_sccs[0].forces_total.value[6][1].magnitude == approx(-3.96793297e-11)
     assert sec_sccs[0].x_fhi_vibes_displacements[2][1].magnitude == approx(0.0)
 
     sec_system = archive.section_run[0].section_system[0]
