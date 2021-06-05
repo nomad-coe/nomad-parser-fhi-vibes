@@ -29,7 +29,8 @@ from nomad.parsing.file_parser import FileParser
 
 from .metainfo import m_env
 from nomad.datamodel.metainfo.common_dft import Run, Method, System, Workflow,\
-    SingleConfigurationCalculation, Energy, Forces, Stress, XCFunctionals
+    SingleConfigurationCalculation, Energy, Forces, Stress, XCFunctionals,\
+    Thermodynamics
 from fhivibesparser.metainfo.fhi_vibes import x_fhi_vibes_section_attributes,\
     x_fhi_vibes_section_metadata, x_fhi_vibes_section_atoms, x_fhi_vibes_section_MD,\
     x_fhi_vibes_section_calculator, x_fhi_vibes_section_calculator_parameters,\
@@ -124,6 +125,7 @@ class FHIVibesParser(FairdiParser):
 
         def parse_scc(n_frame):
             sec_scc = sec_run.m_create(SingleConfigurationCalculation)
+            sec_thermo = sec_scc.m_create(Thermodynamics)
 
             if self.calculation_type == 'molecular_dynamics':
                 sec_scc.time_step = n_frame
@@ -169,8 +171,8 @@ class FHIVibesParser(FairdiParser):
                 elif key == 'stress':
                     sec_scc.m_add_sub_section(
                         SingleConfigurationCalculation.stress_total, Stress(value=val[n_frame]))
-                if key in ['temperature', 'pressure']:
-                    setattr(sec_scc, key, val[n_frame])
+                if key in ['temperature', 'pressure', 'volume']:
+                    setattr(sec_thermo, key, val[n_frame])
                 else:
                     setattr(sec_scc, 'x_fhi_vibes_%s' % key, val[n_frame])
 

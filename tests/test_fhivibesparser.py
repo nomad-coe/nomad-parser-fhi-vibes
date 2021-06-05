@@ -59,7 +59,7 @@ def test_singlepoint(parser):
     assert sec_scc.forces_total.value[5][2].magnitude == approx(-3.47924808e-10)
 
     sec_scc = sec_run[5].section_single_configuration_calculation[0]
-    assert sec_scc.pressure.magnitude == approx(2.52108927e+07)
+    assert sec_scc.thermodynamics[0].pressure.magnitude == approx(2.52108927e+07)
 
     sec_scc = sec_run[2].section_single_configuration_calculation[0]
     assert sec_scc.x_fhi_vibes_pressure_kinetic.magnitude == approx(2.08283962e+08)
@@ -91,7 +91,7 @@ def test_relaxation(parser):
 
     sec_sccs = archive.section_run[0].section_single_configuration_calculation
     assert len(sec_sccs) == 3
-    assert sec_sccs[2].x_fhi_vibes_volume.magnitude == approx(3.97721030e-29)
+    assert sec_sccs[2].thermodynamics[0].volume.magnitude == approx(3.97721030e-29)
     assert sec_sccs[0].energy_contributions[1].value.magnitude == approx(-2.52313962e-15)
 
 
