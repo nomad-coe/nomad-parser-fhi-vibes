@@ -27,10 +27,17 @@ from nomad.units import ureg
 from nomad.parsing.parser import FairdiParser
 from nomad.parsing.file_parser import FileParser
 
-from .metainfo import m_env
-from nomad.datamodel.metainfo.common_dft import Run, Method, System, Workflow,\
-    SingleConfigurationCalculation, Energy, Forces, Stress, XCFunctionals,\
-    Thermodynamics
+from nomad.datamodel.metainfo.run.run import Run, Program
+from nomad.datamodel.metainfo.run.method import (
+    Method, MethodReference, DFT, XCFunctional, Functional
+)
+from nomad.datamodel.metainfo.run.system import (
+    System, Atoms, SystemReference
+)
+from nomad.datamodel.metainfo.run.calculation import (
+    Calculation, Thermodynamics, Energy, EnergyEntry, Stress, StressEntry, Forces, ForcesEntry
+)
+from nomad.datamodel.metainfo.workflow import Workflow
 from fhivibesparser.metainfo.fhi_vibes import x_fhi_vibes_section_attributes,\
     x_fhi_vibes_section_metadata, x_fhi_vibes_section_atoms, x_fhi_vibes_section_MD,\
     x_fhi_vibes_section_calculator, x_fhi_vibes_section_calculator_parameters,\
@@ -92,7 +99,6 @@ class FHIVibesParser(FairdiParser):
             mainfile_binary_header_re=br'^\x89HDF')
 
         self.parser = XarrayParser()
-        self._metainfo_env = m_env
 
         self._units = {
             'volume': ureg.angstrom ** 3, 'displacements': ureg.angstrom, 'velocities': ureg.angstrom / ureg.fs,
@@ -114,40 +120,40 @@ class FHIVibesParser(FairdiParser):
 
         def parse_system(n_frame):
             sec_system = sec_run.m_create(System)
-            sec_system.atom_labels = self.parser.get('attrs').get('symbols')
-            sec_system.atom_positions = self.parser.get('positions', unit=self._units.get('length'))[n_frame]
-            sec_system.lattice_vectors = self.parser.get('cell', unit=self._units.get('length'))[n_frame]
-            sec_system.configuration_periodic_dimensions = self.parser.get('attrs/raw_metadata/atoms/pbc')
+            sec_atoms = sec_system.m_create(Atoms)
+            sec_atoms.labels = self.parser.get('attrs').get('symbols')
+            sec_atoms.positions = self.parser.get('positions', unit=self._units.get('length'))[n_frame]
+            sec_atoms.lattice_vectors = self.parser.get('cell', unit=self._units.get('length'))[n_frame]
+            sec_atoms.periodic = self.parser.get('attrs/raw_metadata/atoms/pbc')
             velocities = self.parser.get('velocities', unit=self._units.get('velocities'))
             if velocities is not None:
-                sec_system.atom_velocities = velocities[n_frame]
+                sec_atoms.velocities = velocities[n_frame]
             return sec_system
 
         def parse_scc(n_frame):
-            sec_scc = sec_run.m_create(SingleConfigurationCalculation)
+            sec_scc = sec_run.m_create(Calculation)
             sec_thermo = sec_scc.m_create(Thermodynamics)
 
             if self.calculation_type == 'molecular_dynamics':
-                sec_scc.time_step = n_frame
+                sec_thermo.time_step = n_frame
                 # TODO metainfo should be in common
                 sec_scc.x_fhi_vibes_MD_time = n_frame * timestep
 
+            sec_energy = sec_scc.m_create(Energy)
+            sec_forces = sec_scc.m_create(Forces)
+            sec_stress = sec_scc.m_create(Stress)
             for key in ['kinetic', 'potential']:
                 val = self.parser.get('energy_%s' % key, unit=self._units.get('energy'))
                 if val is not None:
-                    sec_energy = sec_scc.m_create(Energy, SingleConfigurationCalculation.energy_contributions)
-                    sec_energy.kind = key
-                    sec_energy.value = val[n_frame]
+                    sec_energy.contributions.append(EnergyEntry(value=val[n_frame], kind=key))
 
                 val = self.parser.get('stress_%s' % key, unit=self._units.get('stress'))
                 if val is not None:
-                    sec_stress = sec_scc.m_create(Stress, SingleConfigurationCalculation.stress_contributions)
-                    sec_stress.kind = key
-                    sec_stress.value = val[n_frame]
+                    sec_stress.contributions.append(StressEntry(value=val[n_frame], kind=key))
 
                     val = self.parser.get('stresses_%s' % key, unit=self._units.get('stress'))
                     if val is not None:
-                        sec_stress.values_per_atom = val[n_frame]
+                        sec_stress.contributions[-1].values_per_atom = val[n_frame]
 
             calculation_quantities = [
                 'volume', 'displacements', 'momenta', 'forces_harmonic',
@@ -166,11 +172,9 @@ class FHIVibesParser(FairdiParser):
                     key = 'atom_%s' % key
 
                 if key == 'atom_forces':
-                    sec_scc.m_add_sub_section(
-                        SingleConfigurationCalculation.forces_total, Forces(value=val[n_frame]))
+                    sec_forces.total = ForcesEntry(value=val[n_frame])
                 elif key == 'stress':
-                    sec_scc.m_add_sub_section(
-                        SingleConfigurationCalculation.stress_total, Stress(value=val[n_frame]))
+                    sec_stress.total = StressEntry(value=val[n_frame])
                 if key in ['temperature', 'pressure', 'volume']:
                     setattr(sec_thermo, key, val[n_frame])
                 else:
@@ -178,22 +182,22 @@ class FHIVibesParser(FairdiParser):
 
             return sec_scc
 
-        sec_atrr = self.archive.section_run[-1].section_method[-1].x_fhi_vibes_section_attributes[-1]
+        sec_atrr = self.archive.run[-1].method[-1].x_fhi_vibes_section_attributes[-1]
         timestep = sec_atrr.x_fhi_vibes_attributes_timestep
         for n_frame in range(self.n_frames):
             if self.calculation_type == 'single_point':
-                sec_run = self.archive.section_run[n_frame]
+                sec_run = self.archive.run[n_frame]
                 # we can only do this for single point where we have separate section_runs
                 # for each frame
                 sec_run.raw_id = self.parser.get('aims_uuid')[n_frame]
             else:
                 # TODO aims_uuid is in x_fhi_vibes_aims_uuid, this should be changed
-                sec_run = self.archive.section_run[-1]
+                sec_run = self.archive.run[-1]
 
             sec_system = parse_system(n_frame)
             sec_scc = parse_scc(n_frame)
-            sec_scc.single_configuration_calculation_to_system_ref = sec_system
-            sec_scc.single_configuration_to_calculation_method_ref = sec_run.section_method[-1]
+            sec_scc.system_ref.append(SystemReference(value=sec_system))
+            sec_scc.method_ref.append(MethodReference(value=sec_run.method[-1]))
 
         # force constants
         for key in ['force_constants', 'force_constants_remapped']:
@@ -217,9 +221,18 @@ class FHIVibesParser(FairdiParser):
                 if xc_type is None:
                     self.logger.error('Cannot resolve XC functional.')
                     return
-                sec_xc_functional = sec_method.m_create(XCFunctionals)
-                sec_xc_functional.XC_functional_name = '%s_%s_%s' % (
+                name = '%s_%s_%s' % (
                     xc_functional_info.group(2), xc_type, xc_functional_info.group(1))
+                sec_xc_functional = sec_dft.m_create(XCFunctional)
+                functional = Functional(name=name)
+                if 'HYB' in name:
+                    sec_xc_functional.hybrid.append(functional)
+                elif '_X_' in name:
+                    sec_xc_functional.exchange.append(functional)
+                elif '_C_' in name:
+                    sec_xc_functional.correlation.append(functional)
+                else:
+                    sec_xc_functional.contributions.append(functional)
 
         def parse_atoms(section, atoms):
             for key, val in atoms.items():
@@ -294,7 +307,8 @@ class FHIVibesParser(FairdiParser):
                 else:
                     setattr(sec_metadata, key, val)
 
-        sec_method = self.archive.section_run[n_run].m_create(Method)
+        sec_method = self.archive.run[n_run].m_create(Method)
+        sec_dft = sec_method.m_create(DFT)
 
         parse_xc_functional()
 
@@ -357,12 +371,8 @@ class FHIVibesParser(FairdiParser):
         else:
             self.archive.m_create(Run)
 
-        for n_run, sec_run in enumerate(self.archive.section_run):
-            sec_run.program_name = 'FHI-vibes'
-            sec_run.program_version = metadata['vibes']['version']
-
-            if metadata['calculator']['calculator'].lower() == 'aims':
-                sec_run.program_basis_set_type = 'numeric AOs'
+        for n_run, sec_run in enumerate(self.archive.run):
+            sec_run.program = Program(name='FHI-vibes', version=metadata['vibes']['version'])
 
             self.parse_method(n_run)
 
@@ -371,7 +381,7 @@ class FHIVibesParser(FairdiParser):
         # To resolve this, we can redefine single_point workflow to be consistent with
         # the idea of vibes single point but I do not like it.
         sec_workflow = self.archive.m_create(Workflow)
-        sec_workflow.workflow_type = self.calculation_type
+        sec_workflow.type = self.calculation_type
         sec_workflow.calculator = metadata['calculator']['calculator']
 
         self.parse_configurations()
