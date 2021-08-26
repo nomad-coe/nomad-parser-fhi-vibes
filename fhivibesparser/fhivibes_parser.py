@@ -29,7 +29,7 @@ from nomad.parsing.file_parser import FileParser
 
 from nomad.datamodel.metainfo.run.run import Run, Program
 from nomad.datamodel.metainfo.run.method import (
-    Method, MethodReference, DFT, XCFunctional, Functional
+    Method, MethodReference, DFT, XCFunctional, Functional, BasisSet
 )
 from nomad.datamodel.metainfo.run.system import (
     System, Atoms, SystemReference
@@ -375,6 +375,8 @@ class FHIVibesParser(FairdiParser):
             sec_run.program = Program(name='FHI-vibes', version=metadata['vibes']['version'])
 
             self.parse_method(n_run)
+            if metadata['calculator']['calculator'].lower() == 'aims':
+                sec_run.method[-1].basis_set.append(BasisSet(type='numeric AOs'))
 
         # TODO For single_point, we can only have workflow for one vibes single point frame
         # as workflow is not repeating in metainfo.

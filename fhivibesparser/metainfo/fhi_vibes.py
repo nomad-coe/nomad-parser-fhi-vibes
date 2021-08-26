@@ -26,6 +26,9 @@ from nomad.metainfo import (  # pylint: disable=unused-import
 from nomad.datamodel.metainfo import run
 
 
+m_package = Package()
+
+
 class x_fhi_vibes_method(MCategory):
     '''
     Parameters from vibes metadata belonging to section method.
