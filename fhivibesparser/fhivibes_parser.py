@@ -27,14 +27,14 @@ from nomad.units import ureg
 from nomad.parsing.parser import FairdiParser
 from nomad.parsing.file_parser import FileParser
 
-from nomad.datamodel.metainfo.run.run import Run, Program
-from nomad.datamodel.metainfo.run.method import (
-    Method, MethodReference, DFT, XCFunctional, Functional, BasisSet
+from nomad.datamodel.metainfo.simulation.run import Run, Program
+from nomad.datamodel.metainfo.simulation.method import (
+    Method, DFT, XCFunctional, Functional, BasisSet
 )
-from nomad.datamodel.metainfo.run.system import (
-    System, Atoms, SystemReference
+from nomad.datamodel.metainfo.simulation.system import (
+    System, Atoms
 )
-from nomad.datamodel.metainfo.run.calculation import (
+from nomad.datamodel.metainfo.simulation.calculation import (
     Calculation, Thermodynamics, Energy, EnergyEntry, Stress, StressEntry, Forces, ForcesEntry
 )
 from nomad.datamodel.metainfo.workflow import Workflow
@@ -196,8 +196,8 @@ class FHIVibesParser(FairdiParser):
 
             sec_system = parse_system(n_frame)
             sec_scc = parse_scc(n_frame)
-            sec_scc.system_ref.append(SystemReference(value=sec_system))
-            sec_scc.method_ref.append(MethodReference(value=sec_run.method[-1]))
+            sec_scc.system_ref = sec_system
+            sec_scc.method_ref = sec_run.method[-1]
 
         # force constants
         for key in ['force_constants', 'force_constants_remapped']:
